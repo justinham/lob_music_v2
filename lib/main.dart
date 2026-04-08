@@ -599,6 +599,7 @@ class _MusicHomeState extends State<MusicHome> {
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 // Spinning tape — rotate clockwise/counter-clockwise to seek
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onPanStart: (details) {
                     _isDraggingDisc = true;
                     _discRotation = 0;
@@ -612,7 +613,7 @@ class _MusicHomeState extends State<MusicHome> {
                     if (angleDelta < -3.14159) angleDelta += 2 * 3.14159;
                     _discRotation += angleDelta;
                     _lastAngle = currentAngle;
-                    final seekMs = (_discRotation * 30000 / (2 * 3.14159)).toInt();
+                    final seekMs = (_discRotation * 60000 / (2 * 3.14159)).toInt();
                     final newPos = Duration(milliseconds: (_player.position.inMilliseconds + seekMs).clamp(0, (_player.duration?.inMilliseconds ?? 0)));
                     _player.seek(newPos);
                     _discRotation = 0;

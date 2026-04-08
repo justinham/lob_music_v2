@@ -50,6 +50,7 @@ class _MusicHomeState extends State<MusicHome> {
   bool _showFullPlayer = false;
   bool _isShuffled = false;
   bool _isRepeating = false;
+  bool _isCardView = true; // true=card stack, false=horizontal list view
 
   List<SongModel> _allSongs = [];
   List<AlbumModel> _albums = [];
@@ -178,7 +179,7 @@ class _MusicHomeState extends State<MusicHome> {
                 : Stack(children: [
                     Column(children: [
                       _buildTopBar(),
-                      _buildCardStack(),
+                      _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
                       Expanded(child: _buildSongList()),
                       _buildGestureStrip(),
                     ]),
@@ -201,6 +202,12 @@ class _MusicHomeState extends State<MusicHome> {
         const Icon(Icons.library_music, color: Colors.white70),
         const SizedBox(width: 8),
         const Text('Albums', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 12),
+        IconButton(
+          icon: Icon(_isCardView ? Icons.view_carousel : Icons.view_week, color: Colors.white54, size: 22),
+          tooltip: _isCardView ? 'Switch to list' : 'Switch to cards',
+          onPressed: () => setState(() => _isCardView = !_isCardView),
+        ),
         const Spacer(),
         IconButton(
           icon: Icon(Icons.shuffle, color: _isShuffled ? Colors.deepPurpleAccent : Colors.white54, size: 22),
@@ -340,6 +347,60 @@ class _MusicHomeState extends State<MusicHome> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalAlbumList() {
+    if (_albums.isEmpty) return const SizedBox(height: 180, child: Center(child: Text('No albums', style: TextStyle(color: Colors.white54))));
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _albums.length,
+        itemBuilder: (ctx, i) {
+          final album = _albums[i];
+          return GestureDetector(
+            onTap: () => _openAlbum(album),
+            child: Container(
+              width: 140,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    HSLColor.fromAHSL(1, (i * 37.0) % 360, 0.65, 0.4).toColor(),
+                    HSLColor.fromAHSL(1, (i * 37.0 + 40) % 360, 0.65, 0.25).toColor(),
+                  ],
+                ),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(80), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  width: 56, height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.album, color: Colors.white70, size: 32),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Text(album.name, maxLines: 2, textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(height: 4),
+                Text(album.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 10)),
+                Text('${album.songs.length} songs', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 9)),
+              ]),
+            ),
+          );
+        },
       ),
     );
   }

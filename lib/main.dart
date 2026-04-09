@@ -249,8 +249,12 @@ class _MusicHomeState extends State<MusicHome> {
   }
 
   Widget _buildCardStack() {
-    if (_albums.isEmpty) return const SizedBox(height: 200, child: Center(child: Text('No albums', style: TextStyle(color: Colors.white54))));
+    if (_albums.isEmpty) return const SizedBox(height: 230, child: Center(child: Text('No albums', style: TextStyle(color: Colors.white54))));
     final total = _albums.length;
+    final screenW = MediaQuery.of(context).size.width;
+    final cardW = 160.0;
+    final spacing = 65.0;
+    final centerX = screenW / 2 - cardW / 2;
 
     return SizedBox(
       height: 230,
@@ -270,16 +274,16 @@ class _MusicHomeState extends State<MusicHome> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Previous (left, faded)
-                _buildAlbumCard((_cardIndex - 1 + total) % total, -1, 0.5, 0.85),
-                // Next (right, faded)
-                _buildAlbumCard((_cardIndex + 1) % total, 1, 0.5, 0.85),
                 // Far left (barely visible)
-                _buildAlbumCard((_cardIndex - 2 + total) % total, -2, 0.2, 0.72),
-                // Far right (barely visible)
-                _buildAlbumCard((_cardIndex + 2) % total, 2, 0.2, 0.72),
+                _buildAlbumCardAt((_cardIndex - 2 + total) % total, -2, 0.2, 0.72, centerX, spacing, screenW, cardW),
+                // Previous (left, faded)
+                _buildAlbumCardAt((_cardIndex - 1 + total) % total, -1, 0.5, 0.85, centerX, spacing, screenW, cardW),
                 // Center card — TOP, fully opaque, slightly larger
-                _buildAlbumCard(_cardIndex, 0, 1.0, 1.0),
+                _buildAlbumCardAt(_cardIndex, 0, 1.0, 1.0, centerX, spacing, screenW, cardW),
+                // Next (right, faded)
+                _buildAlbumCardAt((_cardIndex + 1) % total, 1, 0.5, 0.85, centerX, spacing, screenW, cardW),
+                // Far right (barely visible)
+                _buildAlbumCardAt((_cardIndex + 2 + total) % total, 2, 0.2, 0.72, centerX, spacing, screenW, cardW),
               ],
             ),
           ),
@@ -288,26 +292,21 @@ class _MusicHomeState extends State<MusicHome> {
     );
   }
 
-  Widget _buildAlbumCard(int albumIdx, int offset, double opacity, double scale) {
+  Widget _buildAlbumCardAt(int albumIdx, int offset, double opacity, double scale, double centerX, double spacing, double screenW, double cardW) {
+    if (albumIdx < 0 || albumIdx >= _albums.length) return const SizedBox();
     final album = _albums[albumIdx];
-    // Smooth drag follows center card, side cards snap
-    final screenW = MediaQuery.of(context).size.width;
-    final cardW = 160.0;
-    final spacing = 65.0;
-    final centerX = screenW / 2 - cardW / 2;
+    // All cards move together proportionally during drag
+    final posX = centerX + offset * spacing + _dragOffset * (1 - offset.abs() * 0.3).clamp(0.2, 1.0);
 
-    return AnimatedPositioned(
-      duration: offset == 0 ? Duration.zero : const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      left: centerX + offset * spacing + (offset == 0 ? _dragOffset : 0),
+    return Positioned(
+      left: posX,
       top: 15 - offset.abs() * 5,
       child: GestureDetector(
         onTap: () {
           if (offset == 0) {
-            // Center → open album
             _openAlbum(album);
           } else {
-            // Side → bring to center
+            // Bring tapped side card to center
             setState(() => _cardIndex = albumIdx);
           }
         },
@@ -316,7 +315,7 @@ class _MusicHomeState extends State<MusicHome> {
           child: Opacity(
             opacity: opacity,
             child: Container(
-              width: 160, height: 200,
+              width: cardW, height: 200,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: LinearGradient(

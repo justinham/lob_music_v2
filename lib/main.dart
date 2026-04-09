@@ -276,12 +276,12 @@ class _MusicHomeState extends State<MusicHome> {
             final dragAngle = _dragOffset / screenW * 2 * 3.14159;
             final angle = baseAngle + dragAngle;
 
-            final radius = screenW / 2.8;
+            final radius = screenW / 3.2;
             final x = centerX + radius * sin(angle);
             final yOffset = radius * 0.25 * (1 - cos(angle));
             final z = cos(angle);
-            final scale = (z + 1) / 2 * 0.4 + 0.6;
-            final opacity = (z + 1) / 2 * 0.5 + 0.3;
+            final scale = (z + 1) / 2 * 0.35 + 0.6;
+            final opacity = z > 0 ? 1.0 : (z + 1) / 2 * 0.5 + 0.1;
 
             return Positioned(
               left: x - 80,

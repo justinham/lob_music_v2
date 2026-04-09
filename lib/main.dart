@@ -201,7 +201,7 @@ class _MusicHomeState extends State<MusicHome> {
                         Expanded(child: Column(children: [
                           _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
                           Expanded(child: _buildSongList()),
-                          if (_hasLoadedPlaylist) _buildGestureStrip(),
+                          _buildGestureStrip(),
                         ])),
                     ]),
                     AnimatedPositioned(

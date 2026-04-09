@@ -174,7 +174,19 @@ class _MusicHomeState extends State<MusicHome> {
     return Scaffold(
       backgroundColor: const Color(0xFF0D0D1A),
       body: SafeArea(
-        child: _isLoading
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (_showSearch) {
+              setState(() { _showSearch = false; _searchQuery = ''; });
+              return;
+            }
+            if (_playerSlideOffset < 0.5) {
+              _animatePlayerOpen(false);
+              return;
+            }
+          },
+          child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : !_permissionGranted
                 ? const Center(child: Text('Storage permission required', style: TextStyle(color: Colors.white)))
@@ -198,6 +210,7 @@ class _MusicHomeState extends State<MusicHome> {
                       child: _buildFullPlayerOverlay(),
                     ),
                   ]),
+        ),
       ),
     );
   }

@@ -619,10 +619,19 @@ class _MusicHomeState extends State<MusicHome> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _animatePlayerOpen(true),
       onHorizontalDragStart: (d) { _stripStartX = d.localPosition.dx; _stripDx = 0; },
       onHorizontalDragUpdate: (d) { setState(() => _stripDx = d.localPosition.dx - _stripStartX); },
       onHorizontalDragEnd: (d) { _onStripHorizontalDrag(_stripDx); _stripDx = 0; setState(() {}); },
+      onVerticalDragStart: (_) { _isDraggingPlayer = true; },
+      onVerticalDragUpdate: (d) {
+        final screenH = MediaQuery.of(context).size.height;
+        setState(() { _playerSlideOffset = (_playerSlideOffset + d.primaryDelta! / (screenH * 0.6)).clamp(0.0, 1.0); });
+      },
+      onVerticalDragEnd: (d) {
+        _isDraggingPlayer = false;
+        final shouldOpen = d.primaryVelocity != null && d.primaryVelocity! < -200 || _playerSlideOffset < 0.5;
+        _animatePlayerOpen(shouldOpen);
+      },
       child: Container(
         height: 72,
         decoration: BoxDecoration(

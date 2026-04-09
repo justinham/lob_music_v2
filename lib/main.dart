@@ -559,6 +559,7 @@ class _MusicHomeState extends State<MusicHome> {
     );
   }
 
+
   Widget _buildFullPlayerOverlay() {
     AlbumModel? currentAlbum;
     SongModel? currentSong;
@@ -573,170 +574,164 @@ class _MusicHomeState extends State<MusicHome> {
     final state = _player.playerState;
 
     return Container(
-        height: MediaQuery.of(context).size.height,
-        color: const Color(0xFF0D0D1A).withAlpha(240),
-        child: SafeArea(
-          child: Column(children: [
-            // Handle bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(children: [
-                Container(width: 40, height: 3, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 8),
-                Row(children: [
-                  IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-                    onPressed: () => _animatePlayerOpen(false),
-                  ),
-                  const Spacer(),
-                  Text(currentAlbum?.name ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                  const Spacer(),
-                  const SizedBox(width: 48),
-                ]),
+      height: MediaQuery.of(context).size.height,
+      color: const Color(0xFF0D0D1A).withAlpha(240),
+      child: SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(children: [
+              Container(width: 40, height: 3, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 8),
+              Row(children: [
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                  onPressed: () => _animatePlayerOpen(false),
+                ),
+                const Spacer(),
+                Text(currentAlbum?.name ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                const Spacer(),
+                const SizedBox(width: 48),
               ]),
-            ),
-            Expanded(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                // Spinning tape — rotate clockwise/counter-clockwise to seek
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: (details) {
-                    _isDraggingDisc = true;
-                    _discRotation = 0;
-                    _lastAngle = _calculateAngle(details.localPosition, const Offset(110, 110));
-                  },
-                  onPanUpdate: (details) {
-                    if (!_isDraggingDisc) return;
-                    final currentAngle = _calculateAngle(details.localPosition, const Offset(110, 110));
-                    var angleDelta = currentAngle - _lastAngle;
-                    if (angleDelta > 3.14159) angleDelta -= 2 * 3.14159;
-                    if (angleDelta < -3.14159) angleDelta += 2 * 3.14159;
-                    _discRotation += angleDelta;
-                    _lastAngle = currentAngle;
-                    final seekMs = (_discRotation * 60000 / (2 * 3.14159)).toInt();
-                    final newPos = Duration(milliseconds: (_player.position.inMilliseconds + seekMs).clamp(0, (_player.duration?.inMilliseconds ?? 0)));
-                    _player.seek(newPos);
-                    _discRotation = 0;
-                  },
-                  onPanEnd: (details) {
-                    _isDraggingDisc = false;
-                    _discRotation = 0;
-                  },
-                  child: Container(
-                    width: 220, height: 220,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(colors: [
-                        Colors.deepPurple.withAlpha(150),
-                        Colors.deepPurple.withAlpha(50),
-                      ]),
-                      border: Border.all(color: Colors.deepPurpleAccent.withAlpha(80), width: 2),
-                      boxShadow: [BoxShadow(color: Colors.deepPurple.withAlpha(80), blurRadius: 40)],
-                    ),
-                    child: Stack(alignment: Alignment.center, children: [
-                      // Rotating disc with sweep gradient
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: state.playing ? 1 : 0),
-                        duration: const Duration(seconds: 3),
-                        builder: (ctx, val, child) => Transform.rotate(
-                          angle: val * 6.28 * 3,
-                          child: Container(
-                            width: 200, height: 200,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: SweepGradient(colors: [
-                                Colors.white10, Colors.deepPurpleAccent.withAlpha(40),
-                                Colors.white10, Colors.deepPurpleAccent.withAlpha(40),
-                                Colors.white10,
-                              ]),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Center disc
-                      Container(
-                        width: 80, height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.deepPurple,
-                          border: Border.all(color: Colors.deepPurpleAccent, width: 2),
-                        ),
-                        child: const Icon(Icons.music_note, color: Colors.white, size: 40),
-                      ),
+            ]),
+          ),
+          Expanded(
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (details) {
+                  _isDraggingDisc = true;
+                  _discRotation = 0;
+                  _lastAngle = _calculateAngle(details.localPosition, const Offset(110, 110));
+                },
+                onPanUpdate: (details) {
+                  if (!_isDraggingDisc) return;
+                  final currentAngle = _calculateAngle(details.localPosition, const Offset(110, 110));
+                  var angleDelta = currentAngle - _lastAngle;
+                  if (angleDelta > 3.14159) angleDelta -= 2 * 3.14159;
+                  if (angleDelta < -3.14159) angleDelta += 2 * 3.14159;
+                  _discRotation += angleDelta;
+                  _lastAngle = currentAngle;
+                  final seekMs = (_discRotation * 60000 / (2 * 3.14159)).toInt();
+                  final newPos = Duration(milliseconds: (_player.position.inMilliseconds + seekMs).clamp(0, (_player.duration?.inMilliseconds ?? 0)));
+                  _player.seek(newPos);
+                  _discRotation = 0;
+                },
+                onPanEnd: (details) {
+                  _isDraggingDisc = false;
+                  _discRotation = 0;
+                },
+                child: Container(
+                  width: 220, height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      Colors.deepPurple.withAlpha(150),
+                      Colors.deepPurple.withAlpha(50),
                     ]),
+                    border: Border.all(color: Colors.deepPurpleAccent.withAlpha(80), width: 2),
+                    boxShadow: [BoxShadow(color: Colors.deepPurple.withAlpha(80), blurRadius: 40)],
                   ),
-                ),
-                const SizedBox(height: 32),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(currentSong.title, maxLines: 2, textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 8),
-                Text(currentSong.artist ?? 'Unknown', style: const TextStyle(color: Colors.white54, fontSize: 14)),
-                const SizedBox(height: 24),
-                // Progress
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: StreamBuilder<Duration>(
-                    stream: _player.positionStream,
-                    builder: (ctx, snap) {
-                      final pos = snap.data ?? Duration.zero;
-                      final dur = _player.duration ?? Duration.zero;
-                      final pct = dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0;
-                      return Column(children: [
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            activeTrackColor: Colors.deepPurpleAccent,
-                            inactiveTrackColor: Colors.white12,
-                            thumbColor: Colors.deepPurpleAccent,
-                            trackHeight: 3,
-                          ),
-                          child: Slider(
-                            value: pct.clamp(0, 1),
-                            onChanged: (v) => _player.seek(Duration(milliseconds: (v * dur.inMilliseconds).toInt())),
+                  child: Stack(alignment: Alignment.center, children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: state.playing ? 1 : 0),
+                      duration: const Duration(seconds: 3),
+                      builder: (ctx, val, child) => Transform.rotate(
+                        angle: val * 6.28 * 3,
+                        child: Container(
+                          width: 200, height: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: SweepGradient(colors: [
+                              Colors.white10, Colors.deepPurpleAccent.withAlpha(40),
+                              Colors.white10, Colors.deepPurpleAccent.withAlpha(40),
+                              Colors.white10,
+                            ]),
                           ),
                         ),
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text(_formatDuration(pos.inMilliseconds), style: const TextStyle(color: Colors.white30, fontSize: 11)),
-                          Text(_formatDuration(dur.inMilliseconds), style: const TextStyle(color: Colors.white30, fontSize: 11)),
-                        ]),
-                      ]);
-                    },
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  IconButton(
-                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
-                    onPressed: () => _player.seekToPrevious(),
-                  ),
-                  const SizedBox(width: 24),
-                  GestureDetector(
-                    onTap: () => state.playing ? _player.pause() : _player.play(),
-                    child: Container(
-                      width: 64, height: 64,
+                      ),
+                    ),
+                    Container(
+                      width: 80, height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.deepPurpleAccent,
-                        boxShadow: [BoxShadow(color: Colors.deepPurpleAccent.withAlpha(100), blurRadius: 16)],
+                        color: Colors.deepPurple,
+                        border: Border.all(color: Colors.deepPurpleAccent, width: 2),
                       ),
-                      child: Icon(state.playing ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 36),
+                      child: const Icon(Icons.music_note, color: Colors.white, size: 40),
                     ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(currentSong.title, maxLines: 2, textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 8),
+              Text(currentSong.artist ?? 'Unknown', style: const TextStyle(color: Colors.white54, fontSize: 14)),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: StreamBuilder<Duration>(
+                  stream: _player.positionStream,
+                  builder: (ctx, snap) {
+                    final pos = snap.data ?? Duration.zero;
+                    final dur = _player.duration ?? Duration.zero;
+                    final pct = dur.inMilliseconds > 0 ? pos.inMilliseconds / dur.inMilliseconds : 0.0;
+                    return Column(children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          activeTrackColor: Colors.deepPurpleAccent,
+                          inactiveTrackColor: Colors.white12,
+                          thumbColor: Colors.deepPurpleAccent,
+                          trackHeight: 3,
+                        ),
+                        child: Slider(
+                          value: pct.clamp(0, 1),
+                          onChanged: (v) => _player.seek(Duration(milliseconds: (v * dur.inMilliseconds).toInt())),
+                        ),
+                      ),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text(_formatDuration(pos.inMilliseconds), style: const TextStyle(color: Colors.white30, fontSize: 11)),
+                        Text(_formatDuration(dur.inMilliseconds), style: const TextStyle(color: Colors.white30, fontSize: 11)),
+                      ]),
+                    ]);
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
+                  onPressed: () => _player.seekToPrevious(),
+                ),
+                const SizedBox(width: 24),
+                GestureDetector(
+                  onTap: () => state.playing ? _player.pause() : _player.play(),
+                  child: Container(
+                    width: 64, height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.deepPurpleAccent,
+                      boxShadow: [BoxShadow(color: Colors.deepPurpleAccent.withAlpha(100), blurRadius: 16)],
+                    ),
+                    child: Icon(state.playing ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 36),
                   ),
-                  const SizedBox(width: 24),
-                  IconButton(
-                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
-                    onPressed: () => _player.seekToNext(),
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                const Text('↻ Rotate disc to seek ↺', style: TextStyle(color: Colors.white24, fontSize: 11)),
+                ),
+                const SizedBox(width: 24),
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
+                  onPressed: () => _player.seekToNext(),
+                ),
               ]),
-            ),
-        ),
-      ]),
-    );
+              const SizedBox(height: 16),
+              const Text('↻ Rotate disc to seek ↺', style: TextStyle(color: Colors.white24, fontSize: 11)),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 }

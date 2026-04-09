@@ -130,6 +130,12 @@ class _MusicHomeState extends State<MusicHome> {
     )).toList();
 
     _allSongs = songs;
+
+    // Auto-select the album with the most songs
+    if (_albums.isNotEmpty) {
+      _albums.sort((a, b) => b.songs.length.compareTo(a.songs.length));
+      _selectedAlbumId = _albums.first.id.toString();
+    }
   }
 
   Future<void> _openAlbum(AlbumModel album) async {

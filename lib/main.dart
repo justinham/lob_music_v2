@@ -279,9 +279,16 @@ class _MusicHomeState extends State<MusicHome> {
             final radius = screenW / 3.2;
             final x = centerX + radius * sin(angle);
             final yOffset = radius * 0.25 * (1 - cos(angle));
-            final z = cos(angle);
-            final scale = (z + 1) / 2 * 0.35 + 0.6;
-            final opacity = z > 0 ? 1.0 : (z + 1) / 2 * 0.5 + 0.1;
+
+            // Normalize angle to [-π, π] to find which card is truly at front
+            var normAngle = angle;
+            while (normAngle > 3.14159) normAngle -= 2 * 3.14159;
+            while (normAngle < -3.14159) normAngle += 2 * 3.14159;
+
+            // Front card (closest to angle=0) is fully opaque; others fade behind
+            final frontWeight = 1.0 - normAngle.abs() / 3.14159; // 1.0 at front, 0 at back
+            final scale = frontWeight * 0.35 + 0.6;
+            final opacity = frontWeight * 0.8 + 0.05;
 
             return Positioned(
               left: x - 80,
@@ -312,8 +319,8 @@ class _MusicHomeState extends State<MusicHome> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha((z > 0 ? 100 : 40).toInt()),
-                            blurRadius: z > 0 ? 20 : 6,
+                            color: Colors.black.withAlpha((frontWeight > 0.5 ? 100 : 40).toInt()),
+                            blurRadius: frontWeight > 0.5 ? 20 : 6,
                             offset: const Offset(0, 6),
                           ),
                         ],
@@ -338,7 +345,7 @@ class _MusicHomeState extends State<MusicHome> {
                               color: Colors.white,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              shadows: z > 0.5 ? [const Shadow(color: Colors.black38, blurRadius: 6)] : null,
+                              shadows: frontWeight > 0.75 ? [const Shadow(color: Colors.black38, blurRadius: 6)] : null,
                             ),
                           ),
                         ),
@@ -347,11 +354,11 @@ class _MusicHomeState extends State<MusicHome> {
                           _albums[i].artist,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withAlpha((opacity * 150).toInt()), fontSize: 11),
+                          style: TextStyle(color: Colors.white.withAlpha((frontWeight * 200 + 40).toInt()), fontSize: 11),
                         ),
                         Text(
                           '${_albums[i].songs.length} songs',
-                          style: TextStyle(color: Colors.white.withAlpha((opacity * 100).toInt()), fontSize: 10),
+                          style: TextStyle(color: Colors.white.withAlpha((frontWeight * 130 + 20).toInt()), fontSize: 10),
                         ),
                       ]),
                     ),

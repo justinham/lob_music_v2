@@ -618,6 +618,7 @@ class _MusicHomeState extends State<MusicHome> {
     }
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => _animatePlayerOpen(true),
       onHorizontalDragStart: (d) { _stripStartX = d.localPosition.dx; _stripDx = 0; },
       onHorizontalDragUpdate: (d) { setState(() => _stripDx = d.localPosition.dx - _stripStartX); },

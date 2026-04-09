@@ -625,20 +625,6 @@ class _MusicHomeState extends State<MusicHome> {
       onHorizontalDragStart: (d) { _stripStartX = d.localPosition.dx; _stripDx = 0; },
       onHorizontalDragUpdate: (d) { setState(() => _stripDx = d.localPosition.dx - _stripStartX); },
       onHorizontalDragEnd: (d) { _onStripHorizontalDrag(_stripDx); _stripDx = 0; setState(() {}); },
-      onVerticalDragStart: (d) { _isDraggingPlayer = true; },
-      onVerticalDragUpdate: (d) {
-        if (!_isDraggingPlayer) return;
-        // d.primaryDelta is negative when dragging up (towards screen top)
-        final screenH = MediaQuery.of(context).size.height;
-        setState(() {
-          _playerSlideOffset = (_playerSlideOffset + d.primaryDelta! / (screenH * 0.6)).clamp(0.0, 1.0);
-        });
-      },
-      onVerticalDragEnd: (d) {
-        _isDraggingPlayer = false;
-        final shouldOpen = d.primaryVelocity != null && d.primaryVelocity! < -200 || _playerSlideOffset < 0.5;
-        _animatePlayerOpen(shouldOpen);
-      },
       child: Container(
         height: 72,
         decoration: BoxDecoration(
@@ -723,22 +709,34 @@ class _MusicHomeState extends State<MusicHome> {
       color: const Color(0xFF0D0D1A).withAlpha(240),
       child: SafeArea(
         child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(children: [
-              Container(width: 40, height: 3, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 8),
-              Row(children: [
-                IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-                  onPressed: () => _animatePlayerOpen(false),
-                ),
-                const Spacer(),
-                Text(currentAlbum?.name ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const Spacer(),
-                const SizedBox(width: 48),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragStart: (_) {},
+            onVerticalDragUpdate: (d) {
+              final screenH = MediaQuery.of(context).size.height;
+              _playerSlideOffset = (_playerSlideOffset + d.primaryDelta! / (screenH * 0.6)).clamp(0.0, 1.0);
+            },
+            onVerticalDragEnd: (d) {
+              final shouldOpen = d.primaryVelocity != null && d.primaryVelocity! < -200 || _playerSlideOffset < 0.5;
+              _animatePlayerOpen(shouldOpen);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(children: [
+                Container(width: 40, height: 3, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 8),
+                Row(children: [
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                    onPressed: () => _animatePlayerOpen(false),
+                  ),
+                  const Spacer(),
+                  Text(currentAlbum?.name ?? '', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  const Spacer(),
+                  const SizedBox(width: 48),
+                ]),
               ]),
-            ]),
+            ),
           ),
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

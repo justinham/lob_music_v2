@@ -252,9 +252,8 @@ class _MusicHomeState extends State<MusicHome> {
     if (_albums.isEmpty) return const SizedBox(height: 230, child: Center(child: Text('No albums', style: TextStyle(color: Colors.white54))));
     final total = _albums.length;
     final screenW = MediaQuery.of(context).size.width;
-    final cardW = 160.0;
-    final spacing = 65.0;
-    final centerX = screenW / 2 - cardW / 2;
+    final screenH = MediaQuery.of(context).size.height;
+    final centerX = screenW / 2;
 
     return SizedBox(
       height: 230,
@@ -269,24 +268,98 @@ class _MusicHomeState extends State<MusicHome> {
           }
           _dragOffset = 0;
         },
-        child: ClipRect(
-          child: Center(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Far left (barely visible)
-                _buildAlbumCardAt((_cardIndex - 2 + total) % total, -2, 0.2, 0.72, centerX, spacing, screenW, cardW),
-                // Previous (left, faded)
-                _buildAlbumCardAt((_cardIndex - 1 + total) % total, -1, 0.5, 0.85, centerX, spacing, screenW, cardW),
-                // Center card — TOP, fully opaque, slightly larger
-                _buildAlbumCardAt(_cardIndex, 0, 1.0, 1.0, centerX, spacing, screenW, cardW),
-                // Next (right, faded)
-                _buildAlbumCardAt((_cardIndex + 1) % total, 1, 0.5, 0.85, centerX, spacing, screenW, cardW),
-                // Far right (barely visible)
-                _buildAlbumCardAt((_cardIndex + 2 + total) % total, 2, 0.2, 0.72, centerX, spacing, screenW, cardW),
-              ],
-            ),
-          ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: List.generate(total, (i) {
+            final anglePerCard = 2 * 3.14159 / total;
+            final baseAngle = (i - _cardIndex) * anglePerCard;
+            final dragAngle = _dragOffset / screenW * 2 * 3.14159;
+            final angle = baseAngle + dragAngle;
+
+            final radius = screenW / 2.8;
+            final x = centerX + radius * sin(angle);
+            final yOffset = radius * 0.25 * (1 - cos(angle));
+            final z = cos(angle);
+            final scale = (z + 1) / 2 * 0.4 + 0.6;
+            final opacity = (z + 1) / 2 * 0.5 + 0.3;
+
+            return Positioned(
+              left: x - 80,
+              top: 15 + yOffset,
+              child: Transform.scale(
+                scale: scale,
+                child: Opacity(
+                  opacity: opacity.clamp(0.0, 1.0),
+                  child: GestureDetector(
+                    onTap: () {
+                      if ((i - _cardIndex) % total == 0) {
+                        _openAlbum(_albums[i]);
+                      } else {
+                        setState(() => _cardIndex = i);
+                      }
+                    },
+                    child: Container(
+                      width: 160, height: 200,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            HSLColor.fromAHSL(1, (i * 37.0) % 360, 0.65, 0.4).toColor(),
+                            HSLColor.fromAHSL(1, (i * 37.0 + 40) % 360, 0.65, 0.25).toColor(),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha((z > 0 ? 100 : 40).toInt()),
+                            blurRadius: z > 0 ? 20 : 6,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Container(
+                          width: 64, height: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(20),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.album, color: Colors.white70, size: 36),
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            _albums[i].name,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              shadows: z > 0.5 ? [const Shadow(color: Colors.black38, blurRadius: 6)] : null,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _albums[i].artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white.withAlpha((opacity * 150).toInt()), fontSize: 11),
+                        ),
+                        Text(
+                          '${_albums[i].songs.length} songs',
+                          style: TextStyle(color: Colors.white.withAlpha((opacity * 100).toInt()), fontSize: 10),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );

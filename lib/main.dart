@@ -51,6 +51,8 @@ class _MusicHomeState extends State<MusicHome> {
   bool _isShuffled = false;
   bool _isRepeating = false;
   bool _isCardView = true; // true=card stack, false=horizontal list view
+  bool _showSearch = false;
+  String _searchQuery = '';
 
   List<SongModel> _allSongs = [];
   List<AlbumModel> _albums = [];
@@ -179,9 +181,14 @@ class _MusicHomeState extends State<MusicHome> {
                 : Stack(children: [
                     Column(children: [
                       _buildTopBar(),
-                      _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
-                      Expanded(child: _buildSongList()),
-                      _buildGestureStrip(),
+                      if (_showSearch)
+                        Expanded(child: _buildSearchOverlay())
+                      else
+                        Expanded(child: Column(children: [
+                          _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
+                          Expanded(child: _buildSongList()),
+                          _buildGestureStrip(),
+                        ])),
                     ]),
                     AnimatedPositioned(
                       duration: _isDraggingPlayer ? Duration.zero : const Duration(milliseconds: 300),
@@ -207,6 +214,11 @@ class _MusicHomeState extends State<MusicHome> {
           icon: Icon(_isCardView ? Icons.view_carousel : Icons.view_week, color: Colors.white54, size: 22),
           tooltip: _isCardView ? 'Switch to list' : 'Switch to cards',
           onPressed: () => setState(() => _isCardView = !_isCardView),
+        ),
+        IconButton(
+          icon: const Icon(Icons.search, color: Colors.white54, size: 22),
+          tooltip: 'Search songs',
+          onPressed: () => setState(() => _showSearch = true),
         ),
         const Spacer(),
         IconButton(
@@ -402,6 +414,110 @@ class _MusicHomeState extends State<MusicHome> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildSearchOverlay() {
+    return Column(children: [
+      // Search bar
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(children: [
+          Expanded(
+            child: TextField(
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: 'Search songs or albums...',
+                hintStyle: const TextStyle(color: Colors.white30),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                filled: true,
+                fillColor: Colors.white.withAlpha(10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white54),
+            onPressed: () => setState(() { _showSearch = false; _searchQuery = ''; }),
+          ),
+        ]),
+      ),
+      // Results
+      Expanded(
+        child: _buildSearchResults(),
+      ),
+    ]);
+  }
+
+  Widget _buildSearchResults() {
+    if (_searchQuery.isEmpty) {
+      return const Center(child: Text('Start typing to search...', style: TextStyle(color: Colors.white24)));
+    }
+
+    // Search songs across all albums
+    final allSongs = <MapEntry<SongModel, AlbumModel>>[];
+    for (var album in _albums) {
+      for (var song in album.songs) {
+        if (song.title.toLowerCase().contains(_searchQuery) ||
+            (song.artist ?? '').toLowerCase().contains(_searchQuery) ||
+            album.name.toLowerCase().contains(_searchQuery)) {
+          allSongs.add(MapEntry(song, album));
+        }
+      }
+    }
+
+    if (allSongs.isEmpty) {
+      return Center(child: Text('No results for "$_searchQuery"', style: const TextStyle(color: Colors.white24)));
+    }
+
+    return ListView.builder(
+      itemCount: allSongs.length,
+      itemBuilder: (ctx, i) {
+        final entry = allSongs[i];
+        final song = entry.key;
+        final album = entry.value;
+        return GestureDetector(
+          onTap: () {
+            _selectedAlbumId = album.id.toString();
+            final songIndex = album.songs.indexOf(song);
+            _openAlbum(album);
+            if (songIndex >= 0) Future.delayed(const Duration(milliseconds: 300), () => _playSong(songIndex));
+            setState(() { _showSearch = false; _searchQuery = ''; });
+          },
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withAlpha(80),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.music_note, color: Colors.deepPurpleAccent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text('${album.name} • ${song.artist ?? "Unknown"}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                ]),
+              ),
+              Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
+            ]),
+          ),
+        );
+      },
     );
   }
 

@@ -431,10 +431,15 @@ class _MusicHomeState extends State<MusicHome> {
           ]),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: songs.length,
-            itemBuilder: (ctx, i) {
+          child: RawScrollbar(
+            thumbVisibility: true,
+            thumbColor: Colors.deepPurpleAccent,
+            thickness: 4,
+            radius: const Radius.circular(4),
+            child: ListView.builder(
+              padding: const EdgeInsets.only(right: 16, bottom: 80, left: 12),
+              itemCount: songs.length,
+              itemBuilder: (ctx, i) {
               final song = songs[i];
               final isPlaying = _currentIndex == i;
               return GestureDetector(
@@ -465,6 +470,7 @@ class _MusicHomeState extends State<MusicHome> {
               );
             },
           ),
+        ),
         ),
       ],
     );
@@ -504,7 +510,10 @@ class _MusicHomeState extends State<MusicHome> {
           color: const Color(0xFF161628),
           border: Border(top: BorderSide(color: Colors.deepPurpleAccent.withAlpha(50))),
         ),
-        child: Column(children: [
+        child: SafeArea(
+          top: false,
+          bottom: true,
+          child: Column(children: [
           const SizedBox(height: 8),
           Container(width: 40, height: 3, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 8),
@@ -555,6 +564,7 @@ class _MusicHomeState extends State<MusicHome> {
           else
             const Padding(padding: EdgeInsets.all(16), child: Text('No song playing', style: TextStyle(color: Colors.white24))),
         ]),
+        ),
       ),
     );
   }

@@ -50,6 +50,7 @@ class _MusicHomeState extends State<MusicHome> {
   bool _showFullPlayer = false;
   bool _isShuffled = false;
   bool _isRepeating = false;
+  bool _hasLoadedPlaylist = false;  // true once an album is loaded and ready to play
   bool _isCardView = true; // true=card stack, false=horizontal list view
   bool _showSearch = false;
   String _searchQuery = '';
@@ -145,6 +146,7 @@ class _MusicHomeState extends State<MusicHome> {
     ).toList();
     await _player.setAudioSource(ConcatenatingAudioSource(children: sources));
     await _player.play();
+    _hasLoadedPlaylist = true;
     setState(() {});
   }
 
@@ -205,7 +207,7 @@ class _MusicHomeState extends State<MusicHome> {
                         Expanded(child: Column(children: [
                           _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
                           Expanded(child: _buildSongList()),
-                          _buildGestureStrip(),
+                          if (_hasLoadedPlaylist) _buildGestureStrip(),
                         ])),
                     ]),
                     AnimatedPositioned(
@@ -561,7 +563,7 @@ class _MusicHomeState extends State<MusicHome> {
             ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white38, size: 20),
-              onPressed: () => setState(() { _selectedAlbumId = null; _player.pause(); }),
+              onPressed: () => setState(() { _selectedAlbumId = null; _player.pause(); _hasLoadedPlaylist = false; }),
             ),
           ]),
         ),

@@ -66,6 +66,7 @@ class _MusicHomeState extends State<MusicHome> {
   String _cloudStatus = '';
   final _dio = Dio();
   static const _cloudServerUrl = 'http://10.0.0.48:8099';
+  static const _deleteChannel = MethodChannel('lob_music/delete');
   String _searchQuery = '';
 
   List<SongModel> _allSongs = [];
@@ -924,30 +925,70 @@ class _MusicHomeState extends State<MusicHome> {
               itemBuilder: (ctx, i) {
               final song = songs[i];
               final isPlaying = _currentIndex == i;
-              return GestureDetector(
-                onTap: () => _playSong(i),
-                child: Container(
+              return Dismissible(
+                key: Key(song.id.toString()),
+                direction: DismissDirection.endToStart,
+                background: Container(
                   margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isPlaying ? Colors.deepPurple.withAlpha(60) : Colors.white.withAlpha(6),
+                    color: Colors.red.shade900,
                     borderRadius: BorderRadius.circular(12),
-                    border: isPlaying ? Border.all(color: Colors.deepPurpleAccent.withAlpha(80)) : null,
                   ),
-                  child: Row(children: [
-                    Icon(isPlaying ? Icons.play_arrow : Icons.music_note, color: isPlaying ? Colors.deepPurpleAccent : Colors.white38, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: isPlaying ? Colors.deepPurpleAccent : Colors.white, fontSize: 14,
-                            fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal)),
-                        Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                      ]),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white, size: 20),
+                ),
+                confirmDismiss: (dir) async {
+                  return await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF1A1A2E),
+                      title: const Text('Delete song?', style: TextStyle(color: Colors.white)),
+                      content: Text('Remove "${song.title}" from device?', style: const TextStyle(color: Colors.white70)),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+                      ],
                     ),
-                    Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
-                  ]),
+                  ) ?? false;
+                },
+                onDismissed: (dir) async {
+                  try {
+                    await _deleteChannel.invokeMethod('deleteSong', {'id': song.id, 'path': song.uri});
+                    await _loadSongs();
+                    setState(() {});
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Delete failed: $e', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        backgroundColor: Colors.red.shade900),
+                    );
+                  }
+                },
+                child: GestureDetector(
+                  onTap: () => _playSong(i),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isPlaying ? Colors.deepPurple.withAlpha(60) : Colors.white.withAlpha(6),
+                      borderRadius: BorderRadius.circular(12),
+                      border: isPlaying ? Border.all(color: Colors.deepPurpleAccent.withAlpha(80)) : null,
+                    ),
+                    child: Row(children: [
+                      Icon(isPlaying ? Icons.play_arrow : Icons.music_note, color: isPlaying ? Colors.deepPurpleAccent : Colors.white38, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: isPlaying ? Colors.deepPurpleAccent : Colors.white, fontSize: 14,
+                              fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal)),
+                          Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                        ]),
+                      ),
+                      Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
+                    ]),
+                  ),
                 ),
               );
             },

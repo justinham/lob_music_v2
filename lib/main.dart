@@ -51,7 +51,7 @@ class _MusicHomeState extends State<MusicHome> {
   bool _isShuffled = false;
   bool _isRepeating = false;
   bool _hasLoadedPlaylist = false;  // true once an album is loaded and ready to play
-  bool _isCardView = true; // true=card stack, false=horizontal list view
+  bool _isCardView = false; // true=card stack, false=horizontal list view
   bool _showSearch = false;
   String _searchQuery = '';
 

@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +56,16 @@ class _MusicHomeState extends State<MusicHome> {
   bool _hasLoadedPlaylist = false;  // true once an album is loaded and ready to play
   bool _isCardView = false; // true=card stack, false=horizontal list view
   bool _showSearch = false;
+  bool _showCloud = false;
+
+  // Cloud downloader state
+  List<String> _cloudFiles = [];
+  final Map<String, double> _cloudDownloadProgress = {};
+  final Set<String> _cloudDownloading = {};
+  final Set<String> _cloudDeleting = {};
+  String _cloudStatus = '';
+  final _dio = Dio();
+  static const _cloudServerUrl = 'http://10.0.0.48:8099';
   String _searchQuery = '';
 
   List<SongModel> _allSongs = [];
@@ -199,9 +212,12 @@ class _MusicHomeState extends State<MusicHome> {
                         Expanded(child: _buildSearchOverlay())
                       else
                         Expanded(child: Column(children: [
-                          _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
-                          Expanded(child: _buildSongList()),
-                          _buildGestureStrip(),
+                          if (!_showCloud) ...[
+                            _isCardView ? _buildCardStack() : _buildHorizontalAlbumList(),
+                            Expanded(child: _buildSongList()),
+                            _buildGestureStrip(),
+                          ],
+                          if (_showCloud) _buildCloudPage(),
                         ])),
                     ]),
                     AnimatedPositioned(
@@ -214,6 +230,242 @@ class _MusicHomeState extends State<MusicHome> {
                   ]),
         ),
       ),
+    );
+  }
+
+  // ============ CLOUD DOWNLOADER ============
+
+  Future<void> _loadCloudFiles() async {
+    try {
+      final resp = await _dio.get('$_cloudServerUrl/files', options: Options(receiveTimeout: const Duration(seconds: 5)));
+      setState(() => _cloudFiles = List<String>.from(resp.data['files'] ?? []));
+    } catch (e) {
+      setState(() => _cloudFiles = []);
+    }
+  }
+
+  String _extractVideoId(String url) {
+    final patterns = [
+      RegExp(r'youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtu\.be/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com/shorts/([a-zA-Z0-9_-]{11})'),
+    ];
+    for (var p in patterns) {
+      final match = p.firstMatch(url);
+      if (match != null) return match.group(1)!;
+    }
+    return '';
+  }
+
+  Future<void> _cloudDownload() async {
+    final url = await Clipboard.getData(Clipboard.kTextPlain);
+    if (url == null || url.text == null || url.text!.trim().isEmpty) return;
+    final videoId = _extractVideoId(url.text!.trim());
+    if (videoId.isEmpty) {
+      setState(() => _cloudStatus = 'Invalid YouTube URL');
+      return;
+    }
+    setState(() => _cloudStatus = 'Downloading to Mac...');
+    try {
+      final resp = await _dio.post(
+        '$_cloudServerUrl/download',
+        data: {'url': url.text!.trim()},
+        options: Options(contentType: Headers.formUrlEncodedContentType),
+      );
+      final data = resp.data;
+      if (data['error'] != null) {
+        setState(() => _cloudStatus = '${data["error"]}');
+      } else {
+        final filename = data['filename'] ?? 'Done';
+        setState(() => _cloudStatus = 'Downloaded! $filename');
+        _loadCloudFiles();
+      }
+    } catch (e) {
+      setState(() => _cloudStatus = 'Server error');
+    }
+  }
+
+  Future<void> _cloudDownloadToPhone(String filename) async {
+    _cloudDownloading.add(filename);
+    _cloudDownloadProgress[filename] = 0;
+    setState(() {});
+
+    try {
+      final safeName = Uri.encodeComponent(filename);
+      final tmpDir = await getTemporaryDirectory();
+      final savePath = '${tmpDir.path}/${DateTime.now().millisecondsSinceEpoch}.mp3';
+
+      await _dio.download(
+        '$_cloudServerUrl/file/$safeName',
+        savePath,
+        options: Options(followRedirects: true, receiveTimeout: const Duration(minutes: 5)),
+        onReceiveProgress: (received, total) {
+          _cloudDownloadProgress[filename] = total > 0 ? received / total : 0;
+          setState(() {});
+        },
+      );
+
+      final downloadsDir = Directory('/storage/emulated/0/Download');
+      if (!await downloadsDir.exists()) await downloadsDir.create(recursive: true);
+      await File(savePath).copy('${downloadsDir.path}/$filename');
+
+      _cloudDownloading.remove(filename);
+      _cloudDownloadProgress.remove(filename);
+      setState(() => _cloudStatus = 'Saved to phone! $filename');
+    } catch (e) {
+      _cloudDownloading.remove(filename);
+      _cloudDownloadProgress.remove(filename);
+      setState(() => _cloudStatus = 'Download failed');
+    }
+  }
+
+  Future<void> _cloudDelete(String filename) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Delete from Mac?', style: TextStyle(color: Colors.white)),
+        content: Text('Remove "$filename"?', style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    _cloudDeleting.add(filename);
+    setState(() {});
+    try {
+      await _dio.delete('$_cloudServerUrl/delete/${Uri.encodeComponent(filename)}');
+      _cloudDeleting.remove(filename);
+      _loadCloudFiles();
+    } catch (e) {
+      _cloudDeleting.remove(filename);
+      setState(() => _cloudStatus = 'Delete failed');
+    }
+  }
+
+  Widget _buildCloudPage() {
+    return Expanded(
+      child: Column(children: [
+        // Input row
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    hintText: 'Paste YouTube URL here',
+                    hintStyle: TextStyle(color: Colors.white24),
+                    prefixIcon: Icon(Icons.link, color: Colors.white38, size: 18),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                  onSubmitted: (_) => _cloudDownload(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: _cloudDownload,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurpleAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Download', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          ]),
+        ),
+        // Status
+        if (_cloudStatus.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(_cloudStatus, style: const TextStyle(color: Colors.white70, fontSize: 12), textAlign: TextAlign.center),
+            ),
+          ),
+        const SizedBox(height: 8),
+        // Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            const Text('JMusic', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            Text('(${_cloudFiles.length})', style: const TextStyle(color: Colors.white38, fontSize: 14)),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+              onPressed: _loadCloudFiles,
+            ),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        // File list
+        Expanded(
+          child: _cloudFiles.isEmpty
+              ? const Center(child: Text('No downloads yet', style: TextStyle(color: Colors.white24)))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _cloudFiles.length,
+                  itemBuilder: (ctx, i) {
+                    final filename = _cloudFiles[i];
+                    final isDownloading = _cloudDownloading.contains(filename);
+                    final isDeleting = _cloudDeleting.contains(filename);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A2E),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.music_note, color: Colors.deepPurpleAccent, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(filename.replaceAll('.mp3', ''), maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        ),
+                        if (isDownloading)
+                          SizedBox(width: 24, height: 24,
+                            child: CircularProgressIndicator(
+                              value: _cloudDownloadProgress[filename],
+                              strokeWidth: 2,
+                              valueColor: const AlwaysStoppedAnimation(Colors.deepPurpleAccent),
+                            ),
+                          )
+                        else if (isDeleting)
+                          const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                        else ...[
+                          IconButton(
+                            icon: const Icon(Icons.download, color: Colors.white54, size: 18),
+                            tooltip: 'Download to phone',
+                            onPressed: () => _cloudDownloadToPhone(filename),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 18),
+                            tooltip: 'Delete from Mac',
+                            onPressed: () => _cloudDelete(filename),
+                          ),
+                        ],
+                      ]),
+                    );
+                  },
+                ),
+        ),
+      ]),
     );
   }
 
@@ -243,6 +495,14 @@ class _MusicHomeState extends State<MusicHome> {
         IconButton(
           icon: Icon(Icons.repeat, color: _isRepeating ? Colors.deepPurpleAccent : Colors.white54, size: 22),
           onPressed: () async { _isRepeating = !_isRepeating; await _player.setLoopMode(_isRepeating ? LoopMode.one : LoopMode.off); setState(() {}); },
+        ),
+        IconButton(
+          icon: Icon(Icons.cloud_download, color: _showCloud ? Colors.deepPurpleAccent : Colors.white54, size: 22),
+          tooltip: 'Cloud downloader',
+          onPressed: () {
+            setState(() => _showCloud = !_showCloud);
+            if (_showCloud) _loadCloudFiles();
+          },
         ),
       ]),
     );

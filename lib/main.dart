@@ -954,7 +954,7 @@ class _MusicHomeState extends State<MusicHome> {
                 },
                 onDismissed: (dir) async {
                   try {
-                    await _deleteChannel.invokeMethod('deleteSong', {'id': song.id, 'path': song.uri});
+                    await _deleteChannel.invokeMethod('deleteSong', {'id': song.id});
                     await _loadSongs();
                     setState(() {});
                   } catch (e) {

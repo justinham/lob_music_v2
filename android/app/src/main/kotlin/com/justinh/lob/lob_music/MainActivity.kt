@@ -1,7 +1,7 @@
 package com.justinh.lob.lob_music
 
-import android.content.ContentResolver
 import android.content.ContentUris
+import android.database.Cursor
 import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -18,21 +18,36 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "deleteSong" -> {
                     val id = call.argument<Int>("id")
-                    val path = call.argument<String>("path")
                     if (id == null) {
                         result.error("INVALID", "id is required", null)
                         return@setMethodCallHandler
                     }
                     try {
-                        // Delete from MediaStore by ID
                         val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toLong())
-                        contentResolver.delete(uri, null, null)
-                        // Also delete the actual file if path is provided
-                        if (path != null) {
-                            val file = File(path)
+
+                        // Look up the actual file path from MediaStore
+                        var filePath: String? = null
+                        val cursor: Cursor? = contentResolver.query(
+                            uri,
+                            arrayOf(MediaStore.Audio.Media.DATA),
+                            null, null, null
+                        )
+                        if (cursor != null && cursor.moveToFirst()) {
+                            val pathIndex = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                            if (pathIndex >= 0) filePath = cursor.getString(pathIndex)
+                            cursor.close()
+                        }
+
+                        // Delete from MediaStore
+                        val rows = contentResolver.delete(uri, null, null)
+
+                        // Also delete the actual file
+                        if (filePath != null) {
+                            val file = File(filePath)
                             if (file.exists()) file.delete()
                         }
-                        result.success(true)
+
+                        result.success(rows > 0)
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
                     }

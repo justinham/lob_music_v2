@@ -269,99 +269,10 @@ class _MusicHomeState extends State<MusicHome> {
         },
         child: Stack(
           alignment: Alignment.center,
-          children: List.generate(total, (i) {
-            final anglePerCard = 2 * 3.14159 / total;
-            final baseAngle = (i - _cardIndex) * anglePerCard;
-            final dragAngle = _dragOffset / screenW * 2 * 3.14159;
-            final angle = baseAngle + dragAngle;
-
-            final radius = screenW / 3.2;
-            final x = centerX + radius * sin(angle);
-            final yOffset = radius * 0.25 * (1 - cos(angle));
-
-            var normAngle = angle;
-            while (normAngle > 3.14159) normAngle -= 2 * 3.14159;
-            while (normAngle < -3.14159) normAngle += 2 * 3.14159;
-
-            final frontWeight = 1.0 - normAngle.abs() / 3.14159;
-            final scale = frontWeight * 0.35 + 0.6;
-            final opacity = frontWeight * 0.8 + 0.05;
-            final isFront = frontWeight > 0.85;
-
-            return Positioned(
-              left: x - 80,
-              top: 15 + yOffset,
-              child: IgnorePointer(
-                ignoring: !isFront,
-                child: Opacity(
-                  opacity: isFront ? 1.0 : opacity.clamp(0.0, 1.0),
-                  child: GestureDetector(
-                    onTap: isFront ? () => _openAlbum(_albums[i]) : null,
-                    child: Transform.scale(
-                      scale: scale,
-                      child: Container(
-                        width: 160, height: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              HSLColor.fromAHSL(1, (i * 37.0) % 360, 0.65, 0.4).toColor(),
-                              HSLColor.fromAHSL(1, (i * 37.0 + 40) % 360, 0.65, 0.25).toColor(),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha((frontWeight > 0.5 ? 100 : 40).toInt()),
-                              blurRadius: frontWeight > 0.5 ? 20 : 6,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          Container(
-                            width: 64, height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(20),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.album, color: Colors.white70, size: 36),
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              _albums[i].name,
-                              maxLines: 2,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                shadows: frontWeight > 0.75 ? [const Shadow(color: Colors.black38, blurRadius: 6)] : null,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _albums[i].artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Colors.white.withAlpha((frontWeight * 200 + 40).toInt()), fontSize: 11),
-                          ),
-                          Text(
-                            '${_albums[i].songs.length} songs',
-                            style: TextStyle(color: Colors.white.withAlpha((frontWeight * 130 + 20).toInt()), fontSize: 10),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
+          children: [
+            for (int offset = -2; offset <= 2; offset++)
+              _buildCarouselCard((_cardIndex + offset + total) % total, offset),
+          ],
         ),
       ),
     );
@@ -446,6 +357,100 @@ class _MusicHomeState extends State<MusicHome> {
                   style: TextStyle(color: Colors.white.withAlpha(opacity == 1.0 ? 100 : 60), fontSize: 10),
                 ),
               ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildCarouselCard(int albumIdx, int offset) {
+    final total = _albums.length;
+    if (albumIdx < 0 || albumIdx >= total) return const SizedBox();
+
+    final screenW = MediaQuery.of(context).size.width;
+    final radius = screenW / 3.2;
+    final spacing = 65.0;
+    final centerX = screenW / 2 - 80;
+
+    // Only front card (offset=0) receives events
+    final isFront = offset == 0;
+
+    // During drag, all cards move together
+    final posX = centerX + offset * spacing + _dragOffset;
+    final yOff = (offset.abs() * 5).toDouble();
+    final scale = 1.0 - offset.abs() * 0.15;
+    final opacity = isFront ? 1.0 : (1.0 - offset.abs() * 0.25).clamp(0.1, 0.6);
+
+    return Positioned(
+      left: posX,
+      top: 15 - yOff,
+      child: IgnorePointer(
+        ignoring: !isFront,
+        child: Opacity(
+          opacity: opacity,
+          child: GestureDetector(
+            onTap: isFront ? () => _openAlbum(_albums[albumIdx]) : null,
+            child: Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 160, height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      HSLColor.fromAHSL(1, (albumIdx * 37.0) % 360, 0.65, 0.4).toColor(),
+                      HSLColor.fromAHSL(1, (albumIdx * 37.0 + 40) % 360, 0.65, 0.25).toColor(),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(isFront ? 100 : 60),
+                      blurRadius: isFront ? 20 : 10,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(
+                    width: 64, height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(20),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.album, color: Colors.white70, size: 36),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      _albums[albumIdx].name,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        shadows: isFront ? [const Shadow(color: Colors.black38, blurRadius: 6)] : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _albums[albumIdx].artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                  Text(
+                    '${_albums[albumIdx].songs.length} songs',
+                    style: const TextStyle(color: Colors.white54, fontSize: 10),
+                  ),
+                ]),
+              ),
             ),
           ),
         ),

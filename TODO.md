@@ -33,3 +33,18 @@
 - `lib/main.dart` — main UI
 - `assets/icon/app_icon.png` — source icon (micon.png)
 - `android/app/src/main/res/` — Android resources (mipmaps, drawables, adaptive icons)
+
+---
+
+## Status Update: 2026-04-09 (Night)
+
+### ✅ Completed Tonight
+- App icon: lobster now displays properly on home screen
+- Carousel: all albums orbit in a circle, front card taps only
+- Default view: horizontal list (card stack toggle available)
+- Limit card rendering to 5 for performance
+- gym reminder: switched to Discord DM
+
+### ❌ Remaining (Deferred — Major Refactor)
+- **Background audio + system media controls**: requires `audio_service` + foreground service + BackgroundPlayer handler. This is a significant architectural change — not a quick fix.
+

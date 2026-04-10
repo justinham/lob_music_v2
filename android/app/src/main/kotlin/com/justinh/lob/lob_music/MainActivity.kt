@@ -1,15 +1,16 @@
 package com.justinh.lob.lob_music
 
-import android.content.ContentUris
-import android.database.Cursor
+import android.app.Activity
+import android.content.IntentSender
 import android.provider.MediaStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.io.File
+import android.content.ContentUris
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "lob_music/delete"
+    private var pendingResult: io.flutter.plugin.common.MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -25,34 +26,36 @@ class MainActivity: FlutterActivity() {
                     try {
                         val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id.toLong())
 
-                        // Look up the actual file path from MediaStore
-                        var filePath: String? = null
-                        val cursor: Cursor? = contentResolver.query(
-                            uri,
-                            arrayOf(MediaStore.Audio.Media.DATA),
-                            null, null, null
+                        // Use createDeleteRequest on Android 11+ to get user consent for deletion
+                        val pendingIntent = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+                        pendingResult = result
+                        startIntentSenderForResult(
+                            pendingIntent.intentSender,
+                            1001,  // request code
+                            null,
+                            0, 0, 0
                         )
-                        if (cursor != null && cursor.moveToFirst()) {
-                            val pathIndex = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
-                            if (pathIndex >= 0) filePath = cursor.getString(pathIndex)
-                            cursor.close()
-                        }
-
-                        // Delete from MediaStore
-                        val rows = contentResolver.delete(uri, null, null)
-
-                        // Also delete the actual file
-                        if (filePath != null) {
-                            val file = File(filePath)
-                            if (file.exists()) file.delete()
-                        }
-
-                        result.success(rows > 0)
+                    } catch (e: IntentSender.SendIntentException) {
+                        result.error("ERROR", "Could not request deletion: ${e.message}", null)
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
                     }
                 }
                 else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 1001) {
+            pendingResult?.let { result ->
+                if (resultCode == Activity.RESULT_OK) {
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+                pendingResult = null
             }
         }
     }

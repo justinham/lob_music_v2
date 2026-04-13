@@ -3,12 +3,12 @@ package com.justinh.lob.lob_music
 import android.app.Activity
 import android.content.IntentSender
 import android.provider.MediaStore
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.content.ContentUris
 
-class MainActivity: FlutterActivity() {
+class MainActivity: AudioServiceFragmentActivity() {
     private val CHANNEL = "lob_music/delete"
     private var pendingResult: io.flutter.plugin.common.MethodChannel.Result? = null
 

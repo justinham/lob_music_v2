@@ -7,11 +7,27 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
+import 'audio_handler.dart';
+
+late AudioPlayer globalPlayer;
+late LobMusicHandler globalHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  runApp(const LobMusicApp());
+  globalPlayer = AudioPlayer();
+  globalHandler = LobMusicHandler(globalPlayer, OnAudioQuery());
+print('[DEBUG] about to call AudioService.init...');
+  await AudioService.init(
+    builder: () => globalHandler,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.justinh.lob.lob_music.channel.audio',
+      androidNotificationChannelName: 'Lob Music Playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ),
+  );  runApp(const LobMusicApp());
 }
 
 class LobMusicApp extends StatelessWidget {
@@ -45,7 +61,7 @@ class MusicHome extends StatefulWidget {
 }
 
 class _MusicHomeState extends State<MusicHome> {
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer get _player => globalPlayer;
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
   bool _permissionGranted = false;
@@ -105,29 +121,41 @@ class _MusicHomeState extends State<MusicHome> {
 
   @override
   void dispose() {
-    _player.dispose();
+    // _player.dispose(); // global player — do not dispose here
     super.dispose();
   }
 
   Future<void> _requestPermissionAndLoad() async {
-    var status = await Permission.audio.status;
-    if (!status.isGranted) status = await Permission.audio.request();
-    if (!status.isGranted) status = await Permission.storage.request();
-    if (status.isGranted) {
-      _permissionGranted = true;
-      await _loadSongs();
+    try {
+      var status = await Permission.audio.status;
+      if (!status.isGranted) {
+        status = await Permission.audio.request();
+      }
+      if (!status.isGranted) {
+        status = await Permission.storage.request();
+      }
+      _permissionGranted = status.isGranted;
+      if (_permissionGranted) await _loadSongs();
+    } catch (e) {
+      _permissionGranted = false;
     }
-    setState(() => _isLoading = false);
+    // 20s absolute timeout to prevent permanent stuck
+    Future.delayed(const Duration(seconds: 20), () {
+      if (_isLoading && mounted) {
+        setState(() => _isLoading = false);
+      }
+    });
   }
 
   Future<void> _loadSongs() async {
-    final songs = await _audioQuery.querySongs(
-      sortType: SongSortType.TITLE,
-      orderType: OrderType.ASC_OR_SMALLER,
-      uriType: UriType.EXTERNAL,
-      ignoreCase: true,
-    );
-    songs.removeWhere((s) => s.duration == null || s.duration! < 30000);
+    try {
+      final songs = await _audioQuery.querySongs(
+        sortType: SongSortType.TITLE,
+        orderType: OrderType.ASC_OR_SMALLER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      ).timeout(const Duration(seconds: 15), onTimeout: () => <SongModel>[]);
+      songs.removeWhere((s) => s.duration == null || s.duration! < 30000);
 
     final Map<String, List<SongModel>> albumMap = {};
     final Map<String, int> albumIdMap = {};
@@ -145,6 +173,10 @@ class _MusicHomeState extends State<MusicHome> {
     )).toList();
 
     _allSongs = songs;
+    } catch (e) {
+      _albums = [];
+      _allSongs = [];
+    }
   }
 
   Future<void> _openAlbum(AlbumModel album) async {
@@ -155,6 +187,20 @@ class _MusicHomeState extends State<MusicHome> {
     await _player.setAudioSource(ConcatenatingAudioSource(children: sources));
     await _player.play();
     _hasLoadedPlaylist = true;
+
+    // Sync queue to audio_service handler for notification controls
+    final items = album.songs.asMap().entries.map((e) => MediaItem(
+      id: e.value.uri!,
+      title: e.value.title,
+      artist: e.value.artist ?? 'Unknown',
+      album: album.name,
+      duration: Duration(milliseconds: e.value.duration ?? 0),
+    )).toList();
+    try {
+      AudioService.updateQueue(items);
+    } catch (e) {
+        }
+
     setState(() {});
   }
 

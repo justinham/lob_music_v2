@@ -10,7 +10,6 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
   final OnAudioQuery _audioQuery;
 
   LobMusicHandler(this._player, this._audioQuery) {
-    print('[DEBUG] LobMusicHandler constructing...');
 
     // Stream player events → system notification
 _player.playbackEventStream.map(_transformEvent).pipe(playbackState);

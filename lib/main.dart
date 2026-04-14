@@ -18,7 +18,6 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   globalPlayer = AudioPlayer();
   globalHandler = LobMusicHandler(globalPlayer, OnAudioQuery());
-print('[DEBUG] about to call AudioService.init...');
   await AudioService.init(
     builder: () => globalHandler,
     config: const AudioServiceConfig(
@@ -27,7 +26,8 @@ print('[DEBUG] about to call AudioService.init...');
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
     ),
-  );  runApp(const LobMusicApp());
+  );
+  runApp(const LobMusicApp());
 }
 
 class LobMusicApp extends StatelessWidget {
@@ -126,6 +126,7 @@ class _MusicHomeState extends State<MusicHome> {
   }
 
   Future<void> _requestPermissionAndLoad() async {
+    final t0 = DateTime.now();
     try {
       var status = await Permission.audio.status;
       if (!status.isGranted) {
@@ -135,26 +136,24 @@ class _MusicHomeState extends State<MusicHome> {
         status = await Permission.storage.request();
       }
       _permissionGranted = status.isGranted;
-      if (_permissionGranted) await _loadSongs();
+      if (_permissionGranted) {
+        await _loadSongs();
+      }
     } catch (e) {
       _permissionGranted = false;
     }
-    // 20s absolute timeout to prevent permanent stuck
-    Future.delayed(const Duration(seconds: 20), () {
-      if (_isLoading && mounted) {
-        setState(() => _isLoading = false);
-      }
-    });
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _loadSongs() async {
+    final t0 = DateTime.now();
     try {
       final songs = await _audioQuery.querySongs(
         sortType: SongSortType.TITLE,
         orderType: OrderType.ASC_OR_SMALLER,
         uriType: UriType.EXTERNAL,
         ignoreCase: true,
-      ).timeout(const Duration(seconds: 15), onTimeout: () => <SongModel>[]);
+      );
       songs.removeWhere((s) => s.duration == null || s.duration! < 30000);
 
     final Map<String, List<SongModel>> albumMap = {};
@@ -180,28 +179,27 @@ class _MusicHomeState extends State<MusicHome> {
   }
 
   Future<void> _openAlbum(AlbumModel album) async {
+    final t0 = DateTime.now();
     _selectedAlbumId = album.id.toString();
     final sources = album.songs.asMap().entries.map((e) =>
       AudioSource.uri(Uri.parse(e.value.uri!), tag: {'title': e.value.title, 'artist': e.value.artist})
     ).toList();
     await _player.setAudioSource(ConcatenatingAudioSource(children: sources));
-    await _player.play();
     _hasLoadedPlaylist = true;
-
-    // Sync queue to audio_service handler for notification controls
-    final items = album.songs.asMap().entries.map((e) => MediaItem(
-      id: e.value.uri!,
-      title: e.value.title,
-      artist: e.value.artist ?? 'Unknown',
-      album: album.name,
-      duration: Duration(milliseconds: e.value.duration ?? 0),
-    )).toList();
-    try {
-      AudioService.updateQueue(items);
-    } catch (e) {
-        }
-
     setState(() {});
+
+    // Defer queue sync and playback so AudioService is fully initialized
+    Future.delayed(const Duration(milliseconds: 300), () {
+      final items = album.songs.asMap().entries.map((e) => MediaItem(
+        id: e.value.uri!,
+        title: e.value.title,
+        artist: e.value.artist ?? 'Unknown',
+        album: album.name,
+        duration: Duration(milliseconds: e.value.duration ?? 0),
+      )).toList();
+      try { AudioService.updateQueue(items); } catch (e) {}
+      _player.play();
+    });
   }
 
   Future<void> _playSong(int index) async {

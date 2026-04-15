@@ -697,49 +697,44 @@ class _MusicHomeState extends State<MusicHome> {
 
   Widget _buildTopBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       child: Row(children: [
-        const Icon(Icons.library_music, color: Colors.white70, size: 18),
-        const SizedBox(width: 6),
-        const Text('Albums', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+        const Icon(Icons.library_music, color: Colors.white70, size: 16),
+        const SizedBox(width: 4),
+        const Text('Albums', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
         const Spacer(),
         IconButton(
           icon: Icon(Icons.cloud_download, color: _showCloud ? Colors.deepPurpleAccent : Colors.white54, size: 20),
           tooltip: 'Cloud downloader',
           onPressed: () { setState(() => _showCloud = !_showCloud); if (_showCloud) _loadCloudFiles(); },
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 4),
         IconButton(
           icon: Icon(_isCardView ? Icons.view_carousel : Icons.view_week, color: Colors.white54, size: 20),
           tooltip: _isCardView ? 'List' : 'Cards',
           onPressed: () => setState(() => _isCardView = !_isCardView),
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 4),
         IconButton(
           icon: const Icon(Icons.search, color: Colors.white54, size: 20),
           tooltip: 'Search',
           onPressed: () => setState(() => _showSearch = true),
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 4),
         IconButton(
           icon: Icon(Icons.shuffle, color: _isShuffled ? Colors.deepPurpleAccent : Colors.white54, size: 20),
           onPressed: () async { _isShuffled = !_isShuffled; await _player.setShuffleModeEnabled(_isShuffled); setState(() {}); },
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 4),
         IconButton(
           icon: Icon(Icons.repeat, color: _isRepeating ? Colors.deepPurpleAccent : Colors.white54, size: 20),
           onPressed: () async { _isRepeating = !_isRepeating; await _player.setLoopMode(_isRepeating ? LoopMode.one : LoopMode.off); setState(() {}); },
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        const SizedBox(width: 4),
         IconButton(
           icon: Icon(Icons.queue_music, color: _playNextQueue.isNotEmpty ? Colors.deepPurpleAccent : Colors.white54, size: 20),
           onPressed: () => _showQueueSheet(),
-          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
       ]),
     );

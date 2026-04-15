@@ -1102,7 +1102,7 @@ class _MusicHomeState extends State<MusicHome> {
                     style: const TextStyle(color: Colors.white38, fontSize: 12)),
                 ]),
               ),
-              Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
+              Align(alignment: Alignment.bottomRight, child: Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12))),
             ]),
           ),
         );
@@ -1226,7 +1226,7 @@ class _MusicHomeState extends State<MusicHome> {
                             style: const TextStyle(color: Colors.white38, fontSize: 12)),
                         ]),
                       ),
-                      Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
+                      Align(alignment: Alignment.bottomRight, child: Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12))),
                     ]),
                   ),
                 ),

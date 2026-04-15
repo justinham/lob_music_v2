@@ -4,47 +4,47 @@
 
 ### 1. App Icon — Lobster image not showing
 - **Status:** In progress
-- **Problem:** APK contains correct icon assets (`micon.png` hashed correctly), Android shows generic robot instead
-- **Last attempt:** Used `flutter_launcher_icons` to generate mipmaps from `assets/icon/app_icon.png`
-- **Next:** Try `adb shell pm clear com.justinh.lob.lob_music` to clear icon cache, or investigate Android adaptive icon XML config
+- **Problem:** Android shows generic robot instead of lobster icon
+- **Note:** v3 updated assets/icon/app_icon.png (compressed from 1MB to 30KB) and mipmaps. v2 has old icon assets. Try replacing mipmaps + `flutter pub get` + rebuild.
+- **Next:** Replace mipmaps from v3's android/app/src/main/res/mipmap-*/ directories and rebuild
 
 ### 2. Background Audio + Media Notification
-- **Status:** Blocked
-- **Problem:** Music stops when app is backgrounded
-- **Root cause:** `just_audio` alone doesn't keep app alive; needs `audio_service` + foreground service
-- **Next:** Requires `audio_service` package + BackgroundPlayer handler refactor (significant architectural change)
+- **Status:** In progress
+- **Status note:** `audio_service` already integrated — notification working. But audio stops when app is backgrounded because foreground service may not be properly wired.
+- **Next:** Verify foreground service is active when playing; check AndroidManifest.xml foreground service type
+
+---
+
+## Features Completed ✅
+
+- [x] **Queue system** — full port from v3 (long-press menu, queue sheet, drain on completion, queue icon)
+- [x] **Gengar empty state** — ghost image when no album selected
+- [x] **Audio interruption handling** — pauses on phone calls/Siri
+- [x] **Snackbar/bottom sheet polish** — deepPurple.shade800, green.shade800
 
 ---
 
 ## Features to Revisit Later
 
-- [ ] **Fix launcher icon** — Android icon cache cleared, try `adb install -r` with `--clear-icon-cache`
-- [ ] **Background audio** — Requires `audio_service` + foreground service (deferred)
-- [ ] **Auto-select album on boot** — Was removed due to infinite loading bug; revisit once background audio is stable
+- [ ] **Fix launcher icon** — replace mipmaps from v3
+- [ ] **Background audio** — verify foreground service wiring
+- [ ] **Auto-select album on boot** — was removed due to infinite loading bug
 
 ---
 
 ## Current Working State
-- **Commit:** `a36118a` ("Add flutter_launcher_icons with proper adaptive icon for Android 8+")
-- **Last stable commit:** `ef42da4` (before icon change attempt)
-- **APK:** `~/Documents/lob_music-debug.apk`
-
-## Key Files
-- `lib/main.dart` — main UI
-- `assets/icon/app_icon.png` — source icon (micon.png)
-- `android/app/src/main/res/` — Android resources (mipmaps, drawables, adaptive icons)
+- **Commit:** `653dd8b` ("Add full queue system from v3")
+- **APK:** Rebuild after mipmap update recommended
+- **Key Files:**
+  - `lib/main.dart` — main UI + queue
+  - `lib/audio_handler.dart` — audio_service + AudioSession handling
+  - `assets/gengar.jpg` — empty state ghost
+  - `assets/icon/app_icon.png` — outdated, replace from v3
 
 ---
 
-## Status Update: 2026-04-09 (Night)
-
-### ✅ Completed Tonight
-- App icon: lobster now displays properly on home screen
-- Carousel: all albums orbit in a circle, front card taps only
-- Default view: horizontal list (card stack toggle available)
-- Limit card rendering to 5 for performance
-- gym reminder: switched to Discord DM
-
-### ❌ Remaining (Deferred — Major Refactor)
-- **Background audio + system media controls**: requires `audio_service` + foreground service + BackgroundPlayer handler. This is a significant architectural change — not a quick fix.
-
+## Recent Commits
+- `653dd8b` Add full queue system from v3
+- `dea64f7` Add gengar empty state, audio interruption handling, queue UI polish
+- `d967fb9` fix startup speed: await AudioService.init in main()
+- `4aab1ba` audio_service: live notification + playback controls

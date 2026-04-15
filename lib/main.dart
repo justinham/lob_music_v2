@@ -731,11 +731,6 @@ class _MusicHomeState extends State<MusicHome> {
           onPressed: () async { _isRepeating = !_isRepeating; await _player.setLoopMode(_isRepeating ? LoopMode.one : LoopMode.off); setState(() {}); },
           padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
         ),
-        IconButton(
-          icon: Icon(Icons.queue_music, color: _playNextQueue.isNotEmpty ? Colors.deepPurpleAccent : Colors.white54, size: 20),
-          onPressed: () => _showQueueSheet(),
-          padding: const EdgeInsets.all(2), constraints: const BoxConstraints(),
-        ),
       ]),
     );
   }
@@ -1295,28 +1290,24 @@ class _MusicHomeState extends State<MusicHome> {
                       style: const TextStyle(color: Colors.white38, fontSize: 11)),
                   ]),
                 ),
-                StreamBuilder<Duration>(
-                  stream: _player.positionStream,
-                  builder: (ctx, snap) {
-                    final pos = snap.data ?? Duration.zero;
-                    final dur = _player.duration ?? Duration.zero;
-                    return Text(
-                      '${_formatDuration(pos.inMilliseconds)} / ${_formatDuration(dur.inMilliseconds)}',
-                      style: const TextStyle(color: Colors.white30, fontSize: 10),
-                    );
-                  },
-                ),
-                const SizedBox(width: 12),
                 StreamBuilder<PlayerState>(
                   stream: _player.playerStateStream,
                   builder: (ctx, snap) {
                     final playing = snap.data?.playing ?? false;
-                    return IconButton(
-                      icon: Icon(playing ? Icons.pause : Icons.play_arrow, color: Colors.white70, size: 26),
-                      onPressed: () => playing ? _player.pause() : _player.play(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    );
+                    return Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(
+                        icon: Icon(Icons.queue_music, color: _playNextQueue.isNotEmpty ? Colors.deepPurpleAccent : Colors.white54, size: 22),
+                        onPressed: () => _showQueueSheet(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      ),
+                      IconButton(
+                        icon: Icon(playing ? Icons.pause : Icons.play_arrow, color: Colors.white70, size: 26),
+                        onPressed: () => playing ? _player.pause() : _player.play(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      ),
+                    ]);
                   },
                 ),
               ]),

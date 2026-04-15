@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
@@ -10,13 +11,25 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
   final OnAudioQuery _audioQuery;
 
   LobMusicHandler(this._player, this._audioQuery) {
+    _initAudioSession();
 
-    // Stream player events → system notification
-_player.playbackEventStream.map(_transformEvent).pipe(playbackState);
-// Current song index → update MediaItem
+    // Stream player events to system notification
+    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+    // Current song index to update MediaItem
     _player.currentIndexStream.listen((index) {
-        if (index != null) {
+      if (index != null) {
         _updateNowPlaying(index);
+      }
+    });
+  }
+
+  Future<void> _initAudioSession() async {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
+    await session.setActive(true);
+    session.interruptionEventStream.listen((event) {
+      if (event.begin) {
+        if (_player.playing) _player.pause();
       }
     });
   }
@@ -72,7 +85,7 @@ _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
       if (songs.isNotEmpty) song = songs.first;
     }
     if (song != null) {
-        mediaItem.add(MediaItem(
+      mediaItem.add(MediaItem(
         id: uri,
         title: song.title,
         artist: song.artist ?? 'Unknown',

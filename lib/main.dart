@@ -934,7 +934,24 @@ class _MusicHomeState extends State<MusicHome> {
 
   Widget _buildSongList() {
     if (_selectedAlbumId == null) {
-      return const Center(child: Text('Tap center card to open album', style: TextStyle(color: Colors.white30, fontSize: 14)));
+      return Stack(children: [
+        Positioned.fill(
+          child: Opacity(
+            opacity: 0.15,
+            child: Image.asset('assets/gengar.jpg', fit: BoxFit.cover),
+          ),
+        ),
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.only(top: 320),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('Tap center card to open album', style: TextStyle(color: Colors.white30, fontSize: 14)),
+              SizedBox(height: 4),
+              Text('Hold a song to add it to queue', style: TextStyle(color: Colors.white24, fontSize: 12)),
+            ]),
+          ),
+        ),
+      ]);
     }
     final album = _albums.firstWhere((a) => a.id.toString() == _selectedAlbumId, orElse: () => _albums.first);
     final songs = album.songs;

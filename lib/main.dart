@@ -91,6 +91,7 @@ class _MusicHomeState extends State<MusicHome> {
   double _dragOffset = 0;   // for smooth swipe animation
   int _currentIndex = 0;
   String? _selectedAlbumId;  // currently open album
+  List<int> _playNextQueue = [];  // play-next queue (hardest - deferred)
 
   // Gesture strip
   double _stripDx = 0;
@@ -116,7 +117,16 @@ class _MusicHomeState extends State<MusicHome> {
     _player.currentIndexStream.listen((i) {
       if (i != null && mounted) setState(() => _currentIndex = i);
     });
-    _player.playerStateStream.listen((s) { if (mounted) setState(() {}); });
+    _player.playerStateStream.listen((s) {
+      if (mounted) setState(() {});
+      // Drain queue when song completes
+      if (s.processingState == ProcessingState.completed && _playNextQueue.isNotEmpty) {
+        final nextIndex = _playNextQueue.removeAt(0);
+        _player.seek(Duration.zero, index: nextIndex);
+        _player.play();
+        setState(() => _currentIndex = nextIndex);
+      }
+    });
   }
 
   @override
@@ -178,6 +188,166 @@ class _MusicHomeState extends State<MusicHome> {
     }
   }
 
+  void _addToPlayNext(int index) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('▶ "${_allSongs[index].title}" will play next',
+          style: const TextStyle(color: Colors.white, fontSize: 12)),
+        backgroundColor: Colors.deepPurple.shade800,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showPlayNextMenu(int index, SongModel song) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(song.title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(song.artist ?? 'Unknown', style: const TextStyle(color: Colors.white54, fontSize: 14)),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.queue_music, color: Colors.deepPurpleAccent),
+                title: const Text('Play Next', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Play immediately after current song', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _addToPlayNext(index);
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.playlist_add, color: Colors.deepPurpleAccent),
+                title: const Text('Add to Queue', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Add to end of queue', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _playNextQueue.add(index));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('✓ "${song.title}" added to queue',
+                      style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      backgroundColor: Colors.green.shade800,
+                      duration: const Duration(seconds: 2)),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQueueSheet() {
+    final album = _albums.cast<AlbumModel?>().firstWhere((a) => a?.id.toString() == _selectedAlbumId, orElse: () => null);
+    if (album == null) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                const Icon(Icons.queue_music, color: Colors.deepPurpleAccent, size: 20),
+                const SizedBox(width: 8),
+                Text('Queue (${_playNextQueue.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (_playNextQueue.isNotEmpty)
+                  TextButton(
+                    onPressed: () { Navigator.pop(ctx); setState(() => _playNextQueue.clear()); },
+                    child: const Text('Clear all', style: TextStyle(color: Colors.red, fontSize: 13)),
+                  ),
+              ]),
+              const SizedBox(height: 8),
+              if (_playNextQueue.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('Queue is empty', style: TextStyle(color: Colors.white24, fontSize: 14)),
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _playNextQueue.length,
+                    itemBuilder: (ctx, i) {
+                      final idx = _playNextQueue[i];
+                      final song = album.songs[idx];
+                      return Dismissible(
+                        key: Key('queue_$i'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          color: Colors.red.shade900,
+                          child: const Icon(Icons.delete, color: Colors.white, size: 20),
+                        ),
+                        onDismissed: (_) { setState(() => _playNextQueue.removeAt(i)); },
+                        confirmDismiss: (_) async {
+                          return await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: const Color(0xFF1A1A2E),
+                              title: const Text('Remove from queue?', style: TextStyle(color: Colors.white)),
+                              content: Text('Remove "${song.title}" from queue?', style: const TextStyle(color: Colors.white70)),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove', style: TextStyle(color: Colors.red))),
+                              ],
+                            ),
+                          ) ?? false;
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.deepPurple.withAlpha(30),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(children: [
+                            Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.deepPurple, borderRadius: BorderRadius.circular(8)),
+                              child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                              ]),
+                            ),
+                            const Icon(Icons.drag_handle, color: Colors.white24, size: 18),
+                          ]),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
   Future<void> _openAlbum(AlbumModel album) async {
     final t0 = DateTime.now();
     _selectedAlbumId = album.id.toString();
@@ -186,6 +356,7 @@ class _MusicHomeState extends State<MusicHome> {
     ).toList();
     await _player.setAudioSource(ConcatenatingAudioSource(children: sources));
     _hasLoadedPlaylist = true;
+    _playNextQueue.clear();
     setState(() {});
 
     // Defer queue sync and playback so AudioService is fully initialized
@@ -204,7 +375,13 @@ class _MusicHomeState extends State<MusicHome> {
 
   Future<void> _playSong(int index) async {
     if (_selectedAlbumId == null) return;
-    final album = _albums.firstWhere((a) => a.id.toString() == _selectedAlbumId);
+    if (_playNextQueue.isNotEmpty) {
+      final nextIndex = _playNextQueue.removeAt(0);
+      await _player.seek(Duration.zero, index: nextIndex);
+      await _player.play();
+      setState(() => _currentIndex = nextIndex);
+      return;
+    }
     await _player.seek(Duration.zero, index: index);
     await _player.play();
     setState(() => _currentIndex = index);
@@ -556,6 +733,12 @@ class _MusicHomeState extends State<MusicHome> {
         IconButton(
           icon: Icon(Icons.repeat, color: _isRepeating ? Colors.deepPurpleAccent : Colors.white54, size: 20),
           onPressed: () async { _isRepeating = !_isRepeating; await _player.setLoopMode(_isRepeating ? LoopMode.one : LoopMode.off); setState(() {}); },
+          padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          icon: Icon(Icons.queue_music, color: _playNextQueue.isNotEmpty ? Colors.deepPurpleAccent : Colors.white54, size: 20),
+          onPressed: () => _showQueueSheet(),
           padding: const EdgeInsets.all(6), constraints: const BoxConstraints(),
         ),
       ]),
@@ -1027,6 +1210,7 @@ class _MusicHomeState extends State<MusicHome> {
                 },
                 child: GestureDetector(
                   onTap: () => _playSong(i),
+                  onLongPress: () => _showPlayNextMenu(i, song),
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

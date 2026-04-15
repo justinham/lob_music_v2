@@ -396,11 +396,12 @@ class _MusicHomeState extends State<MusicHome> {
   Future<void> _playSong(int index) async {
     if (_selectedAlbumId == null) return;
     if (_playNextQueue.isNotEmpty) {
-      final nextIndex = _playNextQueue.removeAt(0);
+      // Remove from queue the song that was tapped, but play it directly without clearing the queue
+      _playNextQueue.remove(index);
       globalHandler.syncQueue(_playNextQueue);
-      await _player.seek(Duration.zero, index: nextIndex);
+      await _player.seek(Duration.zero, index: index);
       await _player.play();
-      setState(() => _currentIndex = nextIndex);
+      setState(() => _currentIndex = index);
       return;
     }
     await _player.seek(Duration.zero, index: index);

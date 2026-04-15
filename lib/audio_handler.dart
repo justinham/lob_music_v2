@@ -10,6 +10,11 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player;
   final OnAudioQuery _audioQuery;
 
+  // Queue state — shared with main.dart
+  final List<int> _queue = [];
+  bool _drainNextCompletion = false;
+  int _currentIndex = 0;
+
   LobMusicHandler(this._player, this._audioQuery) {
     _initAudioSession();
 
@@ -18,7 +23,24 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
     // Current song index to update MediaItem
     _player.currentIndexStream.listen((index) {
       if (index != null) {
+        _currentIndex = index;
         _updateNowPlaying(index);
+      }
+    });
+    // Auto-advance: drain queue if available
+    _player.playerStateStream.listen((s) async {
+      if (s.processingState == ProcessingState.completed) {
+        if (_queue.isNotEmpty) {
+          if (_drainNextCompletion) {
+            _drainNextCompletion = false;
+            return;
+          }
+          final nextIdx = _queue.removeAt(0);
+          _drainNextCompletion = true;
+          await _player.seek(Duration.zero, index: nextIdx);
+          await _player.play();
+          _currentIndex = nextIdx;
+        }
       }
     });
   }
@@ -104,9 +126,30 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> seek(Duration position) => _player.seek(position);
   @override
-  Future<void> skipToNext() => _player.seekToNext();
+  Future<void> skipToNext() async {
+    if (_queue.isNotEmpty) {
+      final nextIdx = _queue.removeAt(0);
+      _drainNextCompletion = true;
+      await _player.seek(Duration.zero, index: nextIdx);
+      await _player.play();
+      _currentIndex = nextIdx;
+    } else {
+      await _player.seekToNext();
+    }
+  }
+
   @override
-  Future<void> skipToPrevious() => _player.seekToPrevious();
+  Future<void> skipToPrevious() async {
+    if (_queue.isNotEmpty) {
+      final prevIdx = _queue.removeAt(0);
+      _drainNextCompletion = true;
+      await _player.seek(Duration.zero, index: prevIdx);
+      await _player.play();
+      _currentIndex = prevIdx;
+    } else {
+      await _player.seekToPrevious();
+    }
+  }
 
   @override
   Future<void> skipToQueueItem(int index) async {
@@ -117,4 +160,16 @@ class LobMusicHandler extends BaseAudioHandler with SeekHandler {
   void setQueue(List<MediaItem> items) {
     queue.add(items);
   }
+
+  /// Sync queue from main.dart
+  void syncQueue(List<int> indices) {
+    _queue.clear();
+    _queue.addAll(indices);
+  }
+
+  void clearQueue() {
+    _queue.clear();
+  }
+
+  bool get hasQueue => _queue.isNotEmpty;
 }

@@ -119,13 +119,6 @@ class _MusicHomeState extends State<MusicHome> {
     });
     _player.playerStateStream.listen((s) {
       if (mounted) setState(() {});
-      // Drain queue when song completes
-      if (s.processingState == ProcessingState.completed && _playNextQueue.isNotEmpty) {
-        final nextIndex = _playNextQueue.removeAt(0);
-        _player.seek(Duration.zero, index: nextIndex);
-        _player.play();
-        setState(() => _currentIndex = nextIndex);
-      }
     });
   }
 
@@ -188,15 +181,36 @@ class _MusicHomeState extends State<MusicHome> {
     }
   }
 
-  void _addToPlayNext(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('▶ "${_allSongs[index].title}" will play next',
-          style: const TextStyle(color: Colors.white, fontSize: 12)),
-        backgroundColor: Colors.deepPurple.shade800,
-        duration: const Duration(seconds: 2),
+  void _showTopNotification(String message, {Color? bg}) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 16, right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: bg ?? Colors.green.shade800,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 13),
+              maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+          ),
+        ),
       ),
     );
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () { entry.remove(); });
+  }
+
+  void _addToPlayNext(int index) {
+    setState(() => _playNextQueue.insert(0, index));
+    globalHandler.syncQueue(_playNextQueue);
+    _showTopNotification('▶ "${_allSongs[index].title}" will play next');
   }
 
   void _showPlayNextMenu(int index, SongModel song) {
@@ -235,12 +249,8 @@ class _MusicHomeState extends State<MusicHome> {
                 onTap: () {
                   Navigator.pop(ctx);
                   setState(() => _playNextQueue.add(index));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('✓ "${song.title}" added to queue',
-                      style: const TextStyle(color: Colors.white, fontSize: 12)),
-                      backgroundColor: Colors.green.shade800,
-                      duration: const Duration(seconds: 2)),
-                  );
+                  globalHandler.syncQueue(_playNextQueue);
+                  _showTopNotification('✓ "${song.title}" added to queue', bg: Colors.green.shade800);
                 },
               ),
             ],
@@ -259,88 +269,97 @@ class _MusicHomeState extends State<MusicHome> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(children: [
-                const Icon(Icons.queue_music, color: Colors.deepPurpleAccent, size: 20),
-                const SizedBox(width: 8),
-                Text('Queue (${_playNextQueue.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                if (_playNextQueue.isNotEmpty)
-                  TextButton(
-                    onPressed: () { Navigator.pop(ctx); setState(() => _playNextQueue.clear()); },
-                    child: const Text('Clear all', style: TextStyle(color: Colors.red, fontSize: 13)),
-                  ),
-              ]),
-              const SizedBox(height: 8),
-              if (_playNextQueue.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('Queue is empty', style: TextStyle(color: Colors.white24, fontSize: 14)),
-                )
-              else
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _playNextQueue.length,
-                    itemBuilder: (ctx, i) {
-                      final idx = _playNextQueue[i];
-                      final song = album.songs[idx];
-                      return Dismissible(
-                        key: Key('queue_$i'),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          color: Colors.red.shade900,
-                          child: const Icon(Icons.delete, color: Colors.white, size: 20),
-                        ),
-                        onDismissed: (_) { setState(() => _playNextQueue.removeAt(i)); },
-                        confirmDismiss: (_) async {
-                          return await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: const Color(0xFF1A1A2E),
-                              title: const Text('Remove from queue?', style: TextStyle(color: Colors.white)),
-                              content: Text('Remove "${song.title}" from queue?', style: const TextStyle(color: Colors.white70)),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove', style: TextStyle(color: Colors.red))),
-                              ],
-                            ),
-                          ) ?? false;
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.deepPurple.withAlpha(30),
-                            borderRadius: BorderRadius.circular(12),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  const Icon(Icons.queue_music, color: Colors.deepPurpleAccent, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Queue (${_playNextQueue.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  if (_playNextQueue.isNotEmpty)
+                    TextButton(
+                      onPressed: () { Navigator.pop(ctx); setState(() => _playNextQueue.clear()); globalHandler.syncQueue(_playNextQueue); },
+                      child: const Text('Clear all', style: TextStyle(color: Colors.red, fontSize: 13)),
+                    ),
+                ]),
+                const SizedBox(height: 8),
+                if (_playNextQueue.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text('Queue is empty', style: TextStyle(color: Colors.white24, fontSize: 14)),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.35),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _playNextQueue.length,
+                      itemBuilder: (ctx, i) {
+                        final idx = _playNextQueue[i];
+                        final song = album.songs[idx];
+                        return Dismissible(
+                          key: Key('queue_$i'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            color: Colors.red.shade900,
+                            child: const Icon(Icons.delete, color: Colors.white, size: 20),
                           ),
-                          child: Row(children: [
-                            Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.deepPurple, borderRadius: BorderRadius.circular(8)),
-                              child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)))),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                                Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                          onDismissed: (_) {
+                            setSheetState(() => _playNextQueue.removeAt(i));
+                            globalHandler.syncQueue(_playNextQueue);
+                            setState(() {});
+                          },
+                          confirmDismiss: (_) async {
+                            return await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: const Color(0xFF1A1A2E),
+                                title: const Text('Remove from queue?', style: TextStyle(color: Colors.white)),
+                                content: Text('Remove "${song.title}" from queue?', style: const TextStyle(color: Colors.white70)),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove', style: TextStyle(color: Colors.red))),
+                                ],
+                              ),
+                            ) ?? false;
+                          },
+                          child: GestureDetector(
+                            onTap: () { Navigator.pop(ctx); _playSong(idx); },
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withAlpha(30),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(children: [
+                                Container(width: 32, height: 32, decoration: BoxDecoration(color: Colors.deepPurple, borderRadius: BorderRadius.circular(8)),
+                                  child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)))),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                    Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                  ]),
+                                ),
+                                const Icon(Icons.drag_handle, color: Colors.white24, size: 18),
                               ]),
                             ),
-                            const Icon(Icons.drag_handle, color: Colors.white24, size: 18),
-                          ]),
-                        ),
-                      );
-                    },
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -357,6 +376,7 @@ class _MusicHomeState extends State<MusicHome> {
     await _player.setAudioSource(ConcatenatingAudioSource(children: sources));
     _hasLoadedPlaylist = true;
     _playNextQueue.clear();
+    globalHandler.clearQueue();
     setState(() {});
 
     // Defer queue sync and playback so AudioService is fully initialized
@@ -377,6 +397,7 @@ class _MusicHomeState extends State<MusicHome> {
     if (_selectedAlbumId == null) return;
     if (_playNextQueue.isNotEmpty) {
       final nextIndex = _playNextQueue.removeAt(0);
+      globalHandler.syncQueue(_playNextQueue);
       await _player.seek(Duration.zero, index: nextIndex);
       await _player.play();
       setState(() => _currentIndex = nextIndex);
@@ -738,8 +759,6 @@ class _MusicHomeState extends State<MusicHome> {
   Widget _buildCardStack() {
     if (_albums.isEmpty) return const SizedBox(height: 230, child: Center(child: Text('No albums', style: TextStyle(color: Colors.white54))));
     final total = _albums.length;
-    final screenW = MediaQuery.of(context).size.width;
-    final centerX = screenW / 2;
 
     return SizedBox(
       height: 230,
@@ -754,15 +773,17 @@ class _MusicHomeState extends State<MusicHome> {
           }
           _dragOffset = 0;
         },
-        child: Stack(
-          alignment: Alignment.center,
-          children: List.generate(total, (i) {
+        child: Builder(builder: (ctx) {
+          final screenW = MediaQuery.of(ctx).size.width;
+          final centerX = screenW / 2;
+          final radius = screenW / 3.2;
+
+          final cards = List.generate(total, (i) {
             final anglePerCard = 2 * 3.14159 / total;
             final baseAngle = (i - _cardIndex) * anglePerCard;
             final dragAngle = _dragOffset / screenW * 2 * 3.14159;
             final angle = baseAngle + dragAngle;
 
-            final radius = screenW / 3.2;
             final x = centerX + radius * sin(angle);
             final yOffset = radius * 0.25 * (1 - cos(angle));
 
@@ -776,6 +797,7 @@ class _MusicHomeState extends State<MusicHome> {
             final isFront = frontWeight > 0.85;
 
             return Positioned(
+              key: ValueKey('card_$i'),
               left: x - 80,
               top: 15 + yOffset,
               child: IgnorePointer(
@@ -848,12 +870,23 @@ class _MusicHomeState extends State<MusicHome> {
                 ),
               ),
             );
-          }),
-        ),
+          });
+
+          // Sort: front card (dist=0) must be LAST in list to render on top
+          final sortedCards = List<Positioned>.from(cards)..sort((a, b) {
+            final aIdx = int.parse((a.key as ValueKey).value.toString().replaceFirst('card_', ''));
+            final bIdx = int.parse((b.key as ValueKey).value.toString().replaceFirst('card_', ''));
+            final aDist = (aIdx - _cardIndex + total) % total;
+            final bDist = (bIdx - _cardIndex + total) % total;
+            return bDist.compareTo(aDist); // reverse: largest distance first, front card last
+          });
+
+
+          return Stack(alignment: Alignment.center, children: sortedCards);
+        }),
       ),
     );
   }
-
   Widget _buildCarouselCard(int albumIdx, int offset) {
     final total = _albums.length;
     if (albumIdx < 0 || albumIdx >= total) return const SizedBox();
@@ -1093,11 +1126,12 @@ class _MusicHomeState extends State<MusicHome> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-                  Text('${album.name} • ${song.artist ?? "Unknown"}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                  Text(song.artist ?? 'Unknown', maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white38, fontSize: 12)),
                 ]),
               ),
-              Align(alignment: Alignment.bottomRight, child: Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12))),
+              const SizedBox(width: 12),
+              Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
             ]),
           ),
         );
@@ -1221,7 +1255,8 @@ class _MusicHomeState extends State<MusicHome> {
                             style: const TextStyle(color: Colors.white38, fontSize: 12)),
                         ]),
                       ),
-                      Align(alignment: Alignment.bottomRight, child: Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12))),
+                      const SizedBox(width: 12),
+                      Text(_formatDuration(song.duration), style: const TextStyle(color: Colors.white30, fontSize: 12)),
                     ]),
                   ),
                 ),
